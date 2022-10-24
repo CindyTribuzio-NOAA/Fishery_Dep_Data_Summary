@@ -1,10 +1,12 @@
 ---
-title: "Fishery Data Summary - Sablefish"
+title: "Fishery-Dependent Observer Data Summary"
 #author: "Cindy Tribuzio"
 #date: "8/10/2021"
-output: 
+output:
   bookdown::word_document2:
     number_sections: false
+    reference_docx: template.docx
+
 ---
 
 ```{r setup, include=FALSE}
@@ -13,13 +15,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r load-packages, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
 # Setup ----
-libs <- c("plyr","tidyverse","ggplot2","patchwork","flextable","bookdown","knitr", "lubridate","janitor")
+spec_name <- c("shark, other", "shark, salmon", "shark, spiny dogfish", "Pacific sleeper shark")
+#spec_name <- "cod, Pacific (gray)"
+#spec_name <- "sablefish (blackcod)"
+
+bio_samps <- "NO" #are biological samples available??
+
+libs <- c("tidyverse", "janitor", "Hmisc", "RColorBrewer", "gridExtra", "gtable", "grid", 
+          "flextable", "officer", "lubridate", "RODBC", "patchwork","bookdown","knitr", "patchwork")
 if(length(libs[which(libs %in% rownames(installed.packages()) == FALSE )]) > 0) {
   install.packages(libs[which(libs %in% rownames(installed.packages()) == FALSE)])}
 lapply(libs, library, character.only = TRUE)
+'%nin%'<-Negate('%in%') #this is a handy function
 
-
-datadir<-(paste(getwd(),"/Data/",sep=""))
+datapath<-(paste0(getwd(),"/Data/"))
 outdir<-(paste(getwd(),"/Output/",sep=""))
 
 theme_SAFE<-function(x){
@@ -34,23 +43,58 @@ theme_SAFE<-function(x){
   x <- align(x,align="center",part="header")
 }
 
-'%nin%'<-Negate('%in%')
+theme_doc<- function(base_size = 12, base_family = "Arial") { #this function sets the theme for the whole figure
+  theme_bw(base_size = base_size, base_family = base_family) %+replace% #also note that this creates a bunch of font warnings that are not a real problem, I just haven't dealt with it yet
+    theme(
+      plot.title=element_text(size=12,colour='black',hjust = 0.5),
+      plot.background=element_blank(),
+      panel.grid.minor=element_blank(),
+      panel.grid.major=element_line(color="grey90"),
+      panel.border = element_blank(),
+      panel.background = element_blank(),
+      axis.line.x = element_line(colour='black'),
+      axis.line.y = element_line(colour='black'),
+      axis.text=element_text(size=10,colour='black'),
+      axis.ticks=element_line(colour='black'),
+      axis.title.y=element_text(colour='black',angle=90),
+      axis.title.x=element_text(colour='black'),
+      legend.background=element_blank(),
+      legend.text=element_text(colour='black',size=10),
+      legend.title=element_text(colour='black',size=10),
+      strip.background=element_blank(),
+      strip.text=element_text(size=10,colour='black')
+    )
+}
+
+#this is an issue for some species names, like sablefish
+#doc_name <- "Sablefish"
+doc_name <- "Sharks"
+#doc_name <- "Pacific cod"
+#doc_name <- as.data.frame(unlist(strsplit(spec_name, split = " ")))
+#names(doc_name) <- "all_names"
+#doc_name <- doc_name %>% 
+#  mutate(names = gsub(',', '', all_names))%>% 
+#  group_by(names) %>% 
+#  summarise(name_count = length(names)) %>% 
+#  filter(name_count == max(name_count)) %>% 
+#  select(names)
+
 ```
 # Introduction
-This report summarizes the fishery depenent data that are available and inform the Gulf of Alaska (GOA) and Bering Sea/Aleutian Islands (BSAI) sablefish stock assessment. 
+This report summarizes the fishery-depenent data observer data that are available and inform the Gulf of Alaska (GOA) and Bering Sea/Aleutian Islands (BSAI) 'r doc_name' stock assessment. Logbook, eLandings and fishticket data are not included here. The format of this report is under development and should be considered a draft. Data are queired from the Alaska Regional Office Catch Accounting System (CAS) and queried through AKFIN. The results are based on total catch estimates and observer deployment information. Due to minor differences in observer strat assignments between CAS and what vessels log into the Observer Declare and Deploy System the total catch estimates may be slightly different from those values reported in the North Pacific Observer Program Annual Reports. Any differences are expected to be minor. Data prior to the 2013 Observer Program Restructure are not included in the analyses presented here due to structural changes in the North Pacific Observer Program.
 
-NOTES: 
-
-1) These data are preliminary and should not be considered absolute. The logic used in linking trips with observer information is still being solidified and there are some issues still to be resolved by AKRO and FMA.
-
-2) Numbers may not exactly match those in annual report due to differences in observer strata assignments from what vessels log into the deployment system compared to what is reported on the fish tickets. Overall, differences are expected to be minor.
-
-3) Starts in 2013 because sampling strata is limited to "old program" prior to that. Not helpful.
 
 ## Observer Deployment Performance
-This section summarizes the projected and realized observer coverage rates since 2016 for patial coverage trips. Values are from the Annual Deployment Plans and the Annual Reports, available on the NPFMC website. Full coverage trips are all assumed to be 100% covered. Zero selection is also not included. Not all observer strata were covered each year. For example, Hook-and-line (HAL) tender was only covered in 2017, in which a total of four trips were made and thus deemed not a useful strata to include. In 2020, observer sampling was significantly impacted March-June due to the pandemic, resulting in minimal coverage during those months and reducing the annual realized coverage rates. The trawl EM EFP went into effect in 2020, in this strata all trips are 100% reviewed, however, the shoreside offloads are 30% reviewed in the GOA and 100% reviewed in the BSAI. The below table only documents partial coverage rates.
+This section summarizes the projected and realized observer coverage rates since 2016 for all partial coverage trips (i.e., not specific to any fishery). Observer strata are defined in the North Pacific Observer Program Annual Reports as follows:
+Full Coverage - catcher/processors (with limited exceptions), motherships, catcher vessels that are participating in programs that have transferable prohibited species catch, catcher vessels using trawl gear that have requested full coverage for all fishing activity within the BSAI and inshore processors receiving or processing Bering Sea pollock.
+Partial Coverage - Catcher vessels fishing in federally managed groundfish or parallel fisheries, excepting when in full coverage, catcher vessels participating in the Pacific halibut or sablefish IFQ fisheries, catcher vessels participating in the CDQ fisheries or those < 46ft LOA using hook-and-line gear for groundfish, catch/processors that qualify for partical coverage; and shoreside or stationary floating processors that are not in the full coverage category.
+No Coverage/Selection - vessels < 40ft LOA, jig and exempted vessels
+
+There are two Electronic Monitoring (EM) programs in effect: fixed-gear EM and trawl EM. the fixed-gear EM program includes both pot and hook-and-line vessels. Trips logged into ODDS for that program have a partial coverage selection rate, and if selected, the vessel must run the EM cameras for the trip duration. After the videos are submitted, 30% of recorded hauls are reviewed and catch is fully censused. There are no biological samples collected from fixed-gear EM trips. Vessels operating in the trawl EM program record all trips and all of the videos are reviewed, however, the review is for compliance monitoring only. Vessels operating in the trawl EM program are required to retain all catch (with limited exceptions) for shoreside sampling by observers at the plant.
+
+For 2013 - 2015, the North Pacific Observer Program deployment strata included vessel level selection criteria and coverage rates are not comparable to current time series, therefore, not included in the table below. Full Selection trips are all assumed to be 100% covered and not reported in the table below. The Zero Selection trips are also not included. Values are from the Annual Deployment Plans and the Annual Reports, available on the NPFMC website. Not all observer strata were covered each year. For example, Hook-and-line (HAL) tender was only covered in 2017, in which a total of four trips were made and thus deemed not a useful strata to include. In 2020, observer sampling was significantly impacted March-June due to the pandemic, resulting in minimal coverage during those months and reducing the annual realized coverage rates. The trawl EM EFP went into effect in 2020, in this strata all trips have 100% of video reviewed for compliance monitoring, and full retention is in effect. Observer sampling occurs shoreside with the target of all Trawl EM EFP deliveries being obsever sampled in the BSAI and 30% in the GOA. The below table only documents partial coverage rates. 
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-obs_cov_dat <- read_csv(paste(datadir,"OBS_rates.csv",sep=""))
+obs_cov_dat <- read_csv(paste0(datapath,"OBS_rates.csv"))
 obs2 <- obs_cov_dat %>% 
   mutate(colvals = paste(format(Expected, drop0trailing = F),"%(",format(Actual,drop0trailing = F),"%)",sep="")) %>%
   select(Year, Strata, colvals) %>% 
@@ -69,124 +113,127 @@ kable(obs2, caption = "Expected observer coverage rate (from the Annual Deployme
 ```
 ## Total Catch
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-CAS_dat<-read.csv(paste(datadir,"gfcatchbyfishery_withnewfields_sablefish.csv",sep=""), header=T)
-head(CAS_dat)
-CAS_dat <- CAS_dat %>% 
-  filter(FMP_SUBAREA %nin% c("SEI","PWSI")) %>% 
-  filter(YEAR >2012) %>%
-  mutate(WEEK_ENDING_DATE = ymd(WEEK_ENDING_DATE),
-         mgmt_area = if_else(FMP_SUBAREA == "BS", "BS",
-                             if_else(FMP_SUBAREA == "AI", "AI",
-                                     if_else(FMP_SUBAREA == "WG", "WGOA",
-                                             if_else(FMP_SUBAREA == "CG", "CGOA", "EGOA")))),
-         OBS_Coverage = if_else(GEAR == "HAL" & SAMPLING_STRATA_NAME == "No Selection", "HAL-None",
-                                if_else(GEAR == "HAL" & SAMPLING_STRATA_NAME == "Full Selection", "HAL-Human-Full",
-                                        if_else(GEAR == "HAL" & SAMPLING_STRATA_NAME == "EM Hook-and-Line Trip Selection", "HAL-EM-Partial",
-                                                if_else(GEAR == "HAL" & SAMPLING_STRATA_NAME == "Vessel Selection"|
-                                                          GEAR == "HAL" & SAMPLING_STRATA_NAME == "Trip Selection"|
-                                                          GEAR == "HAL" & SAMPLING_STRATA_NAME == "Hook-and-Line Trip Selection"|
-                                                          GEAR == "HAL" & SAMPLING_STRATA_NAME == "Small-Vessel Trip Selection"|
-                                                          GEAR == "HAL" & SAMPLING_STRATA_NAME == "Large-Vessel Trip Selection","HAL-Human-Partial",
-                                                        if_else(GEAR == "NPT" & SAMPLING_STRATA_NAME == "No Selection"|
-                                                                  GEAR == "PTR" & SAMPLING_STRATA_NAME == "No Selection", "Trawl-None",
-                                                                if_else(GEAR == "NPT" & SAMPLING_STRATA_NAME == "Full Selection"|
-                                                                          GEAR == "PTR" & SAMPLING_STRATA_NAME == "Full Selection", "Trawl-Human-Full",
-                                                                        if_else(GEAR == "NPT" & SAMPLING_STRATA_NAME == "EM Trawl Selection"|
-                                                                                  GEAR == "PTR" & SAMPLING_STRATA_NAME == "EM Trawl Selection",
-                                                                                "Trawl-EM-Partial",
-                                                                                if_else(GEAR == "NPT" & SAMPLING_STRATA_NAME == "Vessel Selection"|
-                                                                                          GEAR == "NPT" & SAMPLING_STRATA_NAME == "Trip Selection"|
-                                                                                          GEAR == "NPT" & SAMPLING_STRATA_NAME == "Trawl Trip Selection"|
-                                                                                          GEAR == "NPT" & SAMPLING_STRATA_NAME == "Small-Vessel Trip Selection"|
-                                                                                          GEAR == "NPT" & SAMPLING_STRATA_NAME == "Large-Vessel Trip Selection"|
-                                                                                          GEAR == "PTR" & SAMPLING_STRATA_NAME == "Vessel Selection"|
-                                                                                          GEAR == "PTR" & SAMPLING_STRATA_NAME == "Trip Selection"|
-                                                                                          GEAR == "PTR" & SAMPLING_STRATA_NAME == "Trawl Trip Selection"|
-                                                                                          GEAR == "PTR" & SAMPLING_STRATA_NAME == "Small-Vessel Trip Selection"|
-                                                                                          GEAR == "PTR" & SAMPLING_STRATA_NAME == "Large-Vessel Trip Selection",
-                                                                                        "Trawl-Human-Partial",
-                                                                                        if_else(GEAR == "NPT" & SAMPLING_STRATA_NAME == "Tender Trawl Trip Selection"|
-                                                                                                  GEAR == "PTR" & SAMPLING_STRATA_NAME == "Tender Trawl Trip Selection",
-                                                                                                "Trawl-Tender-Human-Partial",
-                                                                                                if_else(GEAR == "PTR" & SAMPLING_STRATA_NAME == "Trawl EM Parital Coverage Selection", "Trawl-EM-Partial",
-                                                                                                        if_else(GEAR == "PTR" & SAMPLING_STRATA_NAME == "Trawl EM Full Coverage Selection", "Trawl-EM-Full",
-                                                                                                                if_else(GEAR == "JIG", "Jig-None",
-                                                                                                                        if_else(GEAR == "POT" & SAMPLING_STRATA_NAME == "No Selection", "Pot-None",
-                                                                                                                                if_else(GEAR == "POT" & SAMPLING_STRATA_NAME == "Full Selection", "Pot-Human-Full",
-                                                                                                                                        if_else(GEAR == "POT" & SAMPLING_STRATA_NAME == "EM Pot Trip Selection", "Pot-EM-Partial",
-                                                                                                                                                if_else(GEAR == "POT" & SAMPLING_STRATA_NAME == "EM Pot Tender Trip Selection", "Pot-Tender-EM-Partial",
-                                                                                                                                                        if_else(GEAR == "POT" & SAMPLING_STRATA_NAME == "Tender Pot Trip Selection", "Pot-Tender-Human-Partial","Pot-Human-Partial"))))))))))))))))))
-
-#broke it into two steps because the above code was soooooooo long
-CAS_dat <- CAS_dat %>% 
-  mutate(observed = if_else(MONITORING_STATUS == "FIXED_GEAR_EM", "Catch",
-                             if_else(MONITORING_STATUS == "TRAWL_EM" | 
-                                       MONITORING_STATUS == "NO_MONITORING", "None","Catch/Biologicals")))
-                                                                                                              
-levels <- CAS_dat %>% 
-  select(GEAR, SAMPLING_STRATA_NAME, OBS_Coverage) %>% 
+CASdat <- read_csv(paste0(getwd(), "/Data/confidential_CAS_all.csv")) %>% 
+  filter(species_name == spec_name)
+                                                                          
+levels <- CASdat %>% 
+  select(agency_gear_code, sampling_strata_name, OBS_Coverage) %>% 
   unique() %>% 
-  arrange(OBS_Coverage,GEAR)
+  arrange(OBS_Coverage, agency_gear_code)
 
-area_catch <- CAS_dat %>% 
-  group_by(YEAR, mgmt_area, GEAR) %>% 
-  summarize(Catch_MT = sum(CATCH_MT))
+area_catch <- CASdat %>% 
+  group_by(year, mgmt_area, agency_gear_code) %>% 
+  summarise(catch_mt = sum(catch_mt)) %>%
+  rename(gear = agency_gear_code)
 
 area_catch$mgmt_area <- factor(area_catch$mgmt_area, 
                                levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
-fig1 <- ggplot(area_catch, aes(x=YEAR, y=Catch_MT, fill = GEAR, color = GEAR))+
-  geom_bar(position = position_stack(), stat = "identity")+
-  facet_grid(mgmt_area~.)
+area_catch$gear <- factor(area_catch$gear, 
+                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+
+C_total <- ggplot(area_catch, aes(x=as.factor(year), y=catch_mt, 
+                               fill = gear, color = gear))+
+  geom_bar(position = position_stack(), stat = "identity", show.legend = F)+
+  facet_grid(mgmt_area~.)+
+  labs(x = "Year", y = "Catch (mt)")+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)))+
+  scale_x_discrete(breaks = seq(min(area_catch$year), max(area_catch$year), by = 2))+
+  theme_doc()
+
+area_tot <- CASdat %>% 
+  group_by(year, mgmt_area) %>% 
+  summarise(totcatch = sum(catch_mt))
+
+area_catch <- area_catch %>% 
+  left_join(area_tot) %>% 
+  mutate(pcatch = catch_mt/totcatch)
+
+area_catch$mgmt_area <- factor(area_catch$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+area_catch$gear <- factor(area_catch$gear, 
+                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+
+C_prop <- ggplot(area_catch, aes(x=as.factor(year), y=catch_mt, 
+                               fill = gear, color = gear))+
+  geom_bar(position = position_fill(), stat = "identity")+
+  facet_grid(mgmt_area~.)+
+  labs(x = "Year", y = "Proportion")+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)))+
+  scale_x_discrete(breaks = seq(min(area_catch$year), max(area_catch$year), by = 2))+
+  theme_doc()
+
+fig1 <- C_total+C_prop
 ```
-```{r totcatch, echo = FALSE, fig.cap = "Total catch estimates (mt) of sablefish in each management area. Colors represent the different gear types."}
+```{r fig1, echo = FALSE,  warning = FALSE, fig.width = 7.5, fig.cap = paste0("Total catch estimates (mt) of ", doc_name, " in each management area. Colors represent the different gear types: HAL (hook and line), JIG (jig), NPT (non-pelagic trawl), POT (pot), PTR (pelagic trawl). Data queried October 8, 2022 through AKFIN")}
 fig1
 ```
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-area_tot <- CAS_dat %>% 
-  group_by(YEAR, mgmt_area) %>% 
-  summarize(totcatch = sum(CATCH_MT))
-obs_catch <- CAS_dat %>% 
-  group_by(YEAR, mgmt_area, OBS_Coverage) %>% 
-  summarize(Catch_MT = sum(CATCH_MT)) %>% 
-  inner_join(area_tot, by = c("YEAR", "mgmt_area")) %>% 
-  mutate(prop_catch = Catch_MT/totcatch)
 
-fig2 <- ggplot(obs_catch, aes(x=YEAR, y=prop_catch, fill=OBS_Coverage, color=OBS_Coverage))+
-  geom_bar(position = position_stack(), stat = "identity")+
-  facet_grid(mgmt_area~.)
+obs_catch <- CASdat %>% 
+  group_by(year, mgmt_area, OBS_Coverage, agency_gear_code) %>% 
+  summarise(catch_mt = sum(catch_mt)) %>% 
+  inner_join(area_tot, by = c("year", "mgmt_area")) %>% 
+  mutate(prop_catch = catch_mt/totcatch) %>% 
+  filter(agency_gear_code != "JIG")
+
+obs_catch$mgmt_area <- factor(obs_catch$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+obs_catch$agency_gear_code <- factor(obs_catch$agency_gear_code, 
+                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+obs_catch$OBS_Coverage <- factor(obs_catch$OBS_Coverage,
+                                 levels = c("None", "Partial", "EM Partial", "Full"))
+
+fig2 <- ggplot(obs_catch, aes(x=as.factor(year), y=prop_catch, fill=OBS_Coverage, color=OBS_Coverage))+
+  geom_bar(position = position_fill(), stat = "identity")+
+  facet_grid(mgmt_area~agency_gear_code)+
+  labs(x = "Year", y = "Proportion")+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)))+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  theme_doc()
 ```
-```{r fig2, echo = FALSE, fig.cap = "Proportion of total catch (mt) of sablefish in each management area by observer coverage type."}
+```{r fig2, echo = FALSE,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Proportion of total catch (mt) of ", doc_name, " in each management area by observer coverage type. Data from jig fisheries has been removed due to scarcity.")}
 fig2
 ```
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-areagear_tot <- CAS_dat %>% 
-  group_by(YEAR, mgmt_area, GEAR) %>% 
-  summarize(totcatch = sum(CATCH_MT))
+areagear_tot <- CASdat %>% 
+  filter(agency_gear_code != "JIG") %>% 
+  group_by(year, mgmt_area, agency_gear_code) %>% 
+  summarise(totcatch = sum(catch_mt))
 
-obs_prop <- CAS_dat %>% 
-  group_by(YEAR, mgmt_area, observed, GEAR) %>% 
-  summarize(Catch_MT = sum(CATCH_MT)) %>% 
-  inner_join(areagear_tot, by = c("YEAR", "mgmt_area","GEAR")) %>% 
-  mutate(prop_catch = Catch_MT/totcatch) %>% 
-  filter(GEAR != "JIG")
+obs_prop <- CASdat %>% 
+  filter(agency_gear_code != "JIG") %>% 
+  group_by(year, mgmt_area, observed, agency_gear_code) %>% 
+  summarise(Catch_MT = sum(catch_mt)) %>% 
+  inner_join(areagear_tot, by = c("year", "mgmt_area","agency_gear_code")) %>% 
+  mutate(prop_catch = Catch_MT/totcatch)
 
-fig3 <- ggplot(obs_prop, aes(x=YEAR, y=prop_catch, fill=observed, color=observed))+
+obs_prop$mgmt_area <- factor(obs_prop$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+obs_prop$agency_gear_code <- factor(obs_prop$agency_gear_code, 
+                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+#obs_prop$OBS_Coverage <- factor(obs_prop$OBS_Coverage,
+#                                 levels = c("None", "Partial", "EM Partial", "Full"))
+
+fig3 <- ggplot(obs_prop, aes(x=as.factor(year), y=prop_catch, fill=observed, color=observed))+
   geom_bar(position = position_stack(), stat = "identity")+
-  facet_grid(mgmt_area~GEAR)  
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  facet_grid(mgmt_area~agency_gear_code)+
+  labs(x = "Year", y = "Proportion")+
+  theme_doc()
 ```
-```{r fig3, echo = FALSE, fig.cap = "Proportion of total catch of sablefish that is observed in each management area and gear type. Catch is for fixed-gear EM, where only the catch is observed, but there is no biological sampling."}
+```{r fig3, echo = FALSE,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Proportion of total catch of ", doc_name, " that is observed in each management area and gear type. Catch Only: monitoring in which only the catch is monitored and no biological data are recorded (i.e., fixed gear EM). Catch/Biologicals: observers monitor the catch, record biological data and take samples. None: catch for unobserved trips.")}
 fig3
 ```
 
 ## IFQ Catch
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-CAS_dat <- CAS_dat %>% 
-  mutate(IFQ = if_else(IFQSABL_CVTRIP_FLAG == "Y" |IFQSABL_CPTRIP_FLAG == "Y", "Y", "N"))
+CASdat <- CASdat %>% 
+  mutate(IFQ = if_else(management_program_code == "IFQ", "Y", "N"))
 
-area_catch_IFQ <- CAS_dat %>% 
-  group_by(YEAR, mgmt_area, IFQ) %>% 
-  summarize(Catch_MT = sum(CATCH_MT)) %>% 
-  inner_join(area_tot, by = c("YEAR", "mgmt_area")) %>% 
+area_catch_IFQ <- CASdat %>% 
+  group_by(year, mgmt_area, IFQ) %>% 
+  summarise(Catch_MT = sum(catch_mt)) %>% 
+  inner_join(area_tot, by = c("year", "mgmt_area")) %>% 
   mutate(prop_IFQ = Catch_MT/totcatch) %>% 
   select(-totcatch)  
   #pivot_longer(cols = c(Catch_MT, prop_IFQ), names_to = "Metric", values_to = "Catch")
@@ -194,133 +241,192 @@ area_catch_IFQ <- CAS_dat %>%
 area_catch_IFQ$mgmt_area <- factor(area_catch_IFQ$mgmt_area, 
                                levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
 
-fig4catch <- ggplot(area_catch_IFQ, aes(x=YEAR, y=Catch_MT, fill = IFQ, color = IFQ))+
+fig4catch <- ggplot(area_catch_IFQ, aes(x=as.factor(year), y=Catch_MT, fill = IFQ, color = IFQ))+
   geom_bar(position = position_stack(), stat = "identity", show.legend = F)+
-  facet_grid(mgmt_area~., scales = "free")
-fig4prop <- ggplot(area_catch_IFQ, aes(x=YEAR, y=prop_IFQ, fill = IFQ, color = IFQ))+
+  facet_grid(mgmt_area~., scales = "free")+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  labs(x = "Year", y = "Catch (t)")+
+  theme_doc()
+fig4prop <- ggplot(area_catch_IFQ, aes(x=as.factor(year), y=prop_IFQ, fill = IFQ, color = IFQ))+
   geom_bar(position = position_stack(), stat = "identity", show.legend = F)+
-  facet_grid(mgmt_area~., scales = "free")
+  facet_grid(mgmt_area~., scales = "free")+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  labs(x = "Year", y = "Proportion")+
+  theme_doc()
 ```
-```{r fig4, echo=F, fig.cap = "Total and proportion of sablefish catch occuring in the IFQ fisheries. Red is non-IFQ and blue is IFQ."}
+```{r fig4, echo=F,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Total and proportion of ", doc_name, " catch occuring in the IFQ fisheries. Red is non-IFQ and blue is IFQ.")}
 fig4catch+fig4prop
 ```
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-area_tot_IFQ <- CAS_dat %>% 
+area_tot_IFQ <- CASdat %>% 
   filter(IFQ == "Y") %>% 
-  group_by(YEAR, mgmt_area) %>% 
-  summarize(totcatch = sum(CATCH_MT))
+  group_by(year, mgmt_area) %>% 
+  summarise(totcatch = sum(catch_mt))
 
-IFQ_gear <- CAS_dat %>% 
+IFQ_gear <- CASdat %>% 
   filter(IFQ == "Y") %>% 
-  group_by(YEAR, mgmt_area, GEAR, IFQ) %>% 
-  summarize(Catch = sum(CATCH_MT)) %>% 
-  inner_join(area_tot_IFQ, by = c("YEAR", "mgmt_area")) %>% 
+  group_by(year, mgmt_area, agency_gear_code, IFQ) %>% 
+  summarise(Catch = sum(catch_mt)) %>% 
+  inner_join(area_tot_IFQ, by = c("year", "mgmt_area")) %>% 
   mutate(prop_catch = Catch/totcatch)
 
 IFQ_gear$mgmt_area <- factor(IFQ_gear$mgmt_area, 
                                levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
-fig5catch <- ggplot(IFQ_gear,aes(x=YEAR,y=Catch, fill = GEAR, color = GEAR))+
+fig5catch <- ggplot(IFQ_gear,aes(x=as.factor(year),y=Catch, fill = agency_gear_code, color = agency_gear_code))+
   geom_bar(position = position_stack(), stat = "identity", show.legend = F)+
-  facet_grid(mgmt_area~.)
-fig5prop <- ggplot(IFQ_gear,aes(x=YEAR,y=prop_catch, fill = GEAR, color = GEAR))+
+  facet_grid(mgmt_area~.)+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  labs(x = "Year", y = "Catch (t)")+
+  theme_doc()
+fig5prop <- ggplot(IFQ_gear,aes(x=as.factor(year),y=prop_catch, fill = agency_gear_code, color = agency_gear_code))+
   geom_bar(position = position_stack(), stat = "identity", show.legend = F)+
-  facet_grid(mgmt_area~.)
+  facet_grid(mgmt_area~.)+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  labs(x = "Year", y = "Proportion")+
+  theme_doc()
 ```
-```{r fig5, echo=F, fig.cap = "Total and proportion of sablefish IFQ catch by gear type. Red is hook-and-line, blue is pot."}
+```{r fig5, echo=F,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Total and proportion of ", doc_name, " IFQ catch by gear type. Red is hook-and-line, blue is pot.")}
 fig5catch+fig5prop
+```
+```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
+area_tot_nonIFQ <- CASdat %>% 
+  filter(IFQ == "N") %>% 
+  group_by(year, mgmt_area) %>% 
+  summarise(totcatch = sum(catch_mt))
+
+nonIFQ_gear <- CASdat %>% 
+  filter(IFQ == "N") %>% 
+  group_by(year, mgmt_area, agency_gear_code, IFQ) %>% 
+  summarise(Catch = sum(catch_mt)) %>% 
+  inner_join(area_tot_nonIFQ, by = c("year", "mgmt_area")) %>% 
+  mutate(prop_catch = Catch/totcatch)
+
+nonIFQ_gear$mgmt_area <- factor(nonIFQ_gear$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+nonIFQ_gear$agency_gear_code <- factor(nonIFQ_gear$agency_gear_code, 
+                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+fig6catch <- ggplot(nonIFQ_gear,aes(x=as.factor(year),y=Catch, fill = agency_gear_code, color = agency_gear_code))+
+  geom_bar(position = position_stack(), stat = "identity", show.legend = F)+
+  facet_grid(mgmt_area~.)+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  labs(x = "Year", y = "Catch (t)")+
+  theme_doc()
+fig6prop <- ggplot(nonIFQ_gear,aes(x=as.factor(year),y=prop_catch, fill = agency_gear_code, color = agency_gear_code))+
+  geom_bar(position = position_stack(), stat = "identity", show.legend = T)+
+  facet_grid(mgmt_area~.)+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  labs(x = "Year", y = "Proportion")+
+  theme_doc()
+```
+```{r fig6, echo=F,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Total and proportion of ", doc_name, " NON-IFQ catch by gear type.")}
+fig6catch+fig6prop
 ```
 
 ## Biologicals
-The same preliminary data caveats apply to biological samples as well. 
-
-Biological samples are collected either by an at-sea observer or port-sampled. The below can be broken out by port or at-sea collections to relfect the difference in spatial resolution of the data.
+Biological samples are collected either by an at-sea observer or port-sampled. The below can be broken out by port or at-sea collections to reflect the difference in spatial resolution of the data. If no biological samples are available for a species, this portion of the report will be blank.
 
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
 # Get biological data ----
-biodat<-read.csv(paste(datadir,"norpac_age_report_flattened_sablefish.csv",sep=""),header=T, skip=7)
+if(bio_samps == "YES"){
+spec_codes <- read_csv(paste0(datapath, "species_code_conv_table.csv")) %>%
+  clean_names() %>% 
+  select(cas_name, cas_code, race_name, race_code, obs_code) %>% 
+  filter(!is.na(race_name)) %>% 
+  rename(akr_species_codes = cas_code)
 
-#note differences in column heading styles.....grrrrr
-#add week number to match above, it's not going to be a perfect match, but haul offload date is not likely to match week end date.
-biodat$Haul.Offload.Date<-dmy(biodat$Haul.Offload.Date)
-biodat$WEEK_ENDING_DATE<-ceiling_date(biodat$Haul.Offload.Date,"week")+
-  ifelse(weekdays(biodat$Haul.Offload.Date) %in% c("Sunday"),6,-1)
-biodat <- biodat %>% 
-  filter(Year >= 2013, FMP.Area != "INSD") %>% 
-  rename(YEAR = Year, VESSEL_FEDERAL_PERMIT = Permit)
-
-#biodat$WEEK_NUMBER<-week(biodat$Haul.Offload.Date)
-
-#drop uneeded fields for now
-bd<-biodat[,c("T.Table","YEAR","WEEK_ENDING_DATE","VESSEL_FEDERAL_PERMIT","Vessel","Gear.Description","FMP.Area","FMP.Subarea","NMFS.Area",
-              "Type.1.Otolith","Type.3.Sex.Length.Weight","Length..cm.","Weight..kg.","Age")]
-
-# Merge ----
-#trip info with biological based on year, week and federal permit
-#need to run it separately based on offload sampling or observer sampling
-
-#make matchable permit fields
-#when T.Table==ATL_Haul Permit = VESSEL_FEDERAL_PERMIT
-#when T.Table==ATL_oFFLOAD Permit = PROCESSOR_FEDERAL_PERMIT
-
-#at-sea obs samples first
-OBS<-bd[bd$T.Table=="ATL_HAUL",]
-
-OBS2 <- OBS %>% 
-  left_join(CAS_dat, by=c("YEAR","WEEK_ENDING_DATE","VESSEL_FEDERAL_PERMIT"))
-OBS2<-OBS2[,!(names(OBS2) %in% c("VESSEL_FEDERAL_PERMIT"))]
-
-#port obs samples second
-PORT<-bd[bd$T.Table=="ATL_OFFLOAD",]
-PORT2 <- PORT %>% 
-  left_join(CAS_dat, by=c("YEAR","WEEK_ENDING_DATE","VESSEL_FEDERAL_PERMIT"))
-PORT2<-PORT2[,!(names(PORT2) %in% c("VESSEL_FEDERAL_PERMIT"))]
-#combine
-bio_obs<-rbind(OBS2,PORT2)
-bio_obs$FMP.Subarea <- factor(bio_obs$FMP.Subarea, 
-                                levels = c("AI","BS","WG","CG","WY","SE"))
-#write.csv(bio_obs,paste(cleandatdir,"biosampls_w_obs_sablefish.csv",sep=""),row.names = F)
-
-bio_obs<-bio_obs[!is.na(bio_obs$SAMPLING_STRATA_NAME),]
-
-#NOTE: still need to track down the ones that don't match up
-bio_obs_nodat<-bio_obs[is.na(bio_obs$SAMPLING_STRATA_NAME),]
+biodat <- read_csv(paste0(datapath, "confidential_NORPAC_flattened_sampledata.csv")) %>% 
+  filter(!is.na(OBS_Coverage),
+         OBS_Coverage %nin% c("EM Partial", "None")) %>% #small number of samples from jig, no-monitoring status or not matched to trip data
+  left_join(spec_codes) %>% 
+  filter(cas_name == spec_name)
 
 # Summary Figs ----
 # LENGTHS ONLY ----
-#coverage group of samples since 2013
-ldat<-bio_obs[bio_obs$Type.3.Sex.Length.Weight=="Y",]
-ct_l <- bio_obs %>% 
-  clean_names() %>% 
-  group_by(year, obs_coverage, fmp_subarea) %>% 
-  summarise(n_samps = length(length_cm))
-fig6_Lprop <- ggplot(ct_l,aes(x=year,y=n_samps,fill=obs_coverage))+
-  geom_bar(position="fill", stat="identity")+
-  labs(y="Proportion",title="Proportion Lengths")+
-  facet_grid(fmp_subarea~.)
+ldat <- biodat %>% 
+  filter(type_3_sex_length_weight == "Y")
+ct_l <- ldat %>% 
+  group_by(year, OBS_Coverage, mgmt_area) %>% 
+  summarise(n_samps = length(type_3_sex_length_weight))
 
-fig6_Lnum <-ggplot(ct_l,aes(x=year,y=n_samps,fill=obs_coverage))+
+ct_l$mgmt_area <- factor(ct_l$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+#ct_l$agency_gear_code <- factor(ct_l$agency_gear_code, 
+#                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+fig7_Lprop <- ggplot(ct_l,aes(x=as.factor(year),y=n_samps,fill=OBS_Coverage))+
+  geom_bar(position="fill", stat="identity")+
+  labs(y="Total Samples", x= "Year", title="Proportion Lengths")+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  facet_grid(mgmt_area~.)+
+  theme_doc()
+
+fig7_Lnum <-ggplot(ct_l,aes(x=as.factor(year),y=n_samps,fill=OBS_Coverage))+
   geom_bar(position="stack", stat="identity", show.legend = F)+
-  labs(y="n lengths",title="Sampled Lengths")+
-  facet_grid(fmp_subarea~.)
+  labs(y="Proportion Samples",x = "Year", title="Sampled Lengths")+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  facet_grid(mgmt_area~.)+
+  theme_doc()}
 ```
-```{r fig6, echo=F, fig.cap = "Total and proportion of lengths by observer strata in each management area"}
-fig6_Lnum+fig6_Lprop
+```{r fig7, echo=F,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Total and proportion of lengths recorded for SPECIESX by observer strata in each management area")}
+if(bio_samps == "YES") {fig7_Lnum+fig7_Lprop}
 ```
 ```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
-Lrate <- bio_obs %>% 
-  clean_names() %>% 
-  group_by(year, obs_coverage, fmp_subarea) %>% 
-  summarise(n_samps = length(length_cm), 
-            catch = mean(catch_mt),
-            Lratio = n_samps/catch)
+if(bio_samps == "YES"){
+# LENGTHS by gear ----
+ct_lgear <- ldat %>% 
+  group_by(year, akr_gear, mgmt_area) %>% 
+  summarise(n_samps = length(type_3_sex_length_weight))
 
-fig7 <-ggplot(Lrate,aes(x=year,y=Lratio,fill=obs_coverage))+
-  geom_bar(position="stack", stat="identity")+
-  labs(y="n lengths/mt",title="Lengths per metric ton")+
-  facet_grid(fmp_subarea~.)
+ct_lgear$mgmt_area <- factor(ct_lgear$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+#ct_l$agency_gear_code <- factor(ct_l$agency_gear_code, 
+#                               levels = c("PTR", "NPT", "JIG", "POT", "HAL"))
+fig8_Lprop <- ggplot(ct_lgear,aes(x=as.factor(year),y=n_samps,fill=akr_gear))+
+  geom_bar(position="fill", stat="identity")+
+  labs(y="Proportion", x = "Year", title="Proportion Lengths")+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  facet_grid(mgmt_area~.)+
+  theme_doc()
+
+fig8_Lnum <-ggplot(ct_lgear,aes(x=as.factor(year),y=n_samps,fill=akr_gear))+
+  geom_bar(position="stack", stat="identity", show.legend = F)+
+  labs(y="Number Samples", x = "Year", title="Sampled Lengths")+
+  scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  facet_grid(mgmt_area~.)+
+  theme_doc()}
 ```
-```{r fig7, echo=F, fig.cap = "Ratio of number of lengths sampled to metric tons of catch by management area and observer strata"}
-fig7
+```{r fig8, echo=F,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Total and proportion of lengths recorded for", doc_name, " by observer strata in each management area")}
+if(bio_samps == "YES"){fig8_Lnum+fig8_Lprop}
+```
+```{r, echo = FALSE, warning = FALSE, results = 'hide',include=FALSE}
+if(bio_samps == "YES"){
+obs_catch2 <- CASdat %>% 
+  group_by(year, mgmt_area) %>% 
+  summarise(tot_catch = sum(catch_mt))
+
+Lgeararea <- ldat %>% 
+  group_by(year, mgmt_area) %>% 
+  summarise(n_samps = length(type_3_sex_length_weight)) %>% 
+  #rename(agency_gear_code = akr_gear) %>% 
+  right_join(obs_catch2) %>% 
+  replace(is.na(.), 0) %>% 
+  mutate(Lratio = n_samps/tot_catch)
+
+#Lrate <- ldat %>% 
+#  group_by(year, OBS_Coverage, mgmt_area) %>% 
+#  summarise(n_samps = length(type_3_sex_length_weight), 
+#            catch = mean(catch_mt),
+#            Lratio = n_samps/catch)
+
+Lgeararea$mgmt_area <- factor(Lgeararea$mgmt_area, 
+                               levels = c("AI", "BS", "WGOA", "CGOA", "EGOA"))
+fig9 <-ggplot(Lgeararea,aes(x=as.factor(year), y=Lratio, fill= mgmt_area))+
+  geom_bar(position="stack", stat="identity")+
+  labs(y="n lengths/mt", x = "Year", title="Lengths per metric ton")+
+  #scale_x_discrete(labels = c("", "2014", "", "", "", "2018", "", "", "", "2022"))+
+  facet_grid(mgmt_area~.)}
+```
+```{r fig9, echo=F,  warning = FALSE,  fig.width = 7.5, fig.cap = paste0("Ratio of number of lengths recorded of ", doc_name, " to metric tons of ", doc_name, " catch by management area and observer strata")}
+if(bio_samps == "YES"){fig9}
 ```
 
 
